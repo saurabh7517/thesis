@@ -1,19 +1,21 @@
 package main
 
 import (
-	"fmt"
+	"net/http"
 
-	"github.com/saurbh7517/artifact/connection"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	"github.com/saurbh7517/artifact/controllers"
 )
 
 func main() {
 
-	var clientset *kubernetes.Clientset = connection.CreateConnection()
+	controllers.RegisterController()
+
+	http.ListenAndServe(":8080", nil)
+
+	// var clientset *kubernetes.Clientset = connection.CreateConnection()
 
 	// access the API to list pods
-	pods, _ := clientset.CoreV1().Pods("").List(v1.ListOptions{})
+	// pods, _ := clientset.CoreV1().Pods("").List(v1.ListOptions{})
 
 	// podfunction.CreateNewPod(clientset)
 
@@ -23,6 +25,6 @@ func main() {
 
 	// request.Body()
 
-	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+	// fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
 
 }
