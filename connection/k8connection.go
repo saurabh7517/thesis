@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-// CreateConnction creates a connection to the kubernetes api-server
+//CreateConnection creates a connection to the kubernetes api-server
 func CreateConnection() *kubernetes.Clientset {
 	var kubeconfig *string
 	home := homedir.HomeDir()
@@ -25,6 +25,6 @@ func CreateConnection() *kubernetes.Clientset {
 	errorhandler.Check(err)
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
-
+	errorhandler.Check(err)
 	return clientset
 }
