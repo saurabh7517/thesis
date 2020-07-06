@@ -5,13 +5,18 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/saurbh7517/artifact/connection"
 	"github.com/saurbh7517/artifact/errorhandler"
 )
 
+//RegisterController is creating controllers for authentic requests
 func RegisterController() {
-	pc := newPodController()
 
-	http.Handle("/pod", *pc)
+	conn := connection.CreateConnection()
+
+	pc := newPodController(conn)
+
+	http.Handle("/fileupload", *pc)
 	http.Handle("/watch", *pc)
 }
 
