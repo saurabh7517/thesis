@@ -3,6 +3,7 @@ package models
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/saurbh7517/artifact/errorhandler"
@@ -53,7 +54,7 @@ func (fs *fileSpec) ProcessFileByNewLine() *map[int][]byte {
 
 	line := make([]byte, 0, lineLength)          // creating a slice in memory for reading a line
 	blockSlice := make([]byte, 0, blockByteSize) //initializing a block size
-
+	fs.file.Seek(0, io.SeekStart)
 	defer fs.file.Close()
 
 	//Getting file details from memory, for detailed info check documentation
