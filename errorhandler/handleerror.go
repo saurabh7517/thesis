@@ -1,10 +1,13 @@
 package errorhandler
 
+import "fmt"
+
 /*
 This function handles error
 */
 func Check(e error) {
 	if e != nil {
-		panic(e)
+		fmt.Println(e)
+		return
 	}
 }
