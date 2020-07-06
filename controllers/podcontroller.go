@@ -23,11 +23,12 @@ func (pc podController) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			//get all running pods
 		case http.MethodPost:
 			// upload file from the client
-
+			pc.uploadFile(w, r)
 		case http.MethodPut:
 			//update pod
 		case http.MethodDelete:
-			//delete pod
+			//delete pods
+			pc.removeAllPods()
 		default:
 			fmt.Println("Wrong Verb Request")
 		}
@@ -40,7 +41,7 @@ func (pc *podController) uploadFile(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseMultipartForm(10 << 20) //max memory of 10MB is allowed for this file Parser
 	errorhandler.Check(err)
 	//reading file from client
-	file, handler, err := r.FormFile("uploadFile")
+	file, handler, err := r.FormFile("myfile")
 	if err != nil {
 		fmt.Println("Error retrieving file from form data")
 		fmt.Println(err)
@@ -70,6 +71,10 @@ func (pc *podController) uploadFile(w http.ResponseWriter, r *http.Request) {
 	var mapPtr *map[int][]byte = myNewFile.ProcessFileByNewLine()
 
 	podfunction.ProcessFileMap(mapPtr, pc.clientset)
+}
+
+func (pc *podController) removeAllPods() {
+	podfunction.DeletePods(pc.clientset)
 }
 
 func newPodController(conn *kubernetes.Clientset) *podController {
