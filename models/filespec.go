@@ -16,6 +16,9 @@ type fileSpec struct {
 	mapfile   *map[int][]byte
 }
 
+//NewFile is for initialization of new file uploaded
+//@Params takes name,size, blocksize and os.File object pointer as input
+//@Return an pointer to newly created object
 func NewFile(fileName string, fileSize int, blockSize int, file *os.File) *fileSpec {
 	return &fileSpec{filename: fileName, filesize: fileSize, blocksize: blockSize, file: file}
 }
