@@ -1,0 +1,12 @@
+# start with a scratch (no layers)
+FROM scratch
+
+# copy our static linked library
+COPY worker worker
+
+# tell we are exposing our service on port 8080
+# EXPOSE 8080
+
+# run it!
+ENTRYPOINT ["./worker"]
+CMD ["worker1"]
