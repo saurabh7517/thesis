@@ -14,7 +14,7 @@ type fileSpec struct {
 	filesize  int
 	blocksize int
 	file      *os.File
-	mapfile   *map[int][]byte
+	mapfile   map[int][]byte
 }
 
 //NewFile is for initialization of new file uploaded
@@ -45,7 +45,7 @@ func writeToFile(fileIndex int, blockSlicePtr *[]byte) {
 
 }
 
-func (fs *fileSpec) ProcessFileByNewLine() *map[int][]byte {
+func (fs *fileSpec) ProcessFileByNewLine() map[int][]byte {
 	//This code will load a file in memory and split that into configurable size
 	var numberOfBlocks int
 	var fileByteSize int
@@ -123,6 +123,6 @@ func (fs *fileSpec) ProcessFileByNewLine() *map[int][]byte {
 	mapper[count+1] = blockSlice
 	// writeToFile(count+1, &blockSlice)
 	fmt.Println("The map is ", len(mapper))
-	fs.mapfile = &mapper
+	fs.mapfile = mapper
 	return fs.mapfile
 }

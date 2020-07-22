@@ -68,7 +68,7 @@ func (pc *podController) uploadFile(w http.ResponseWriter, r *http.Request) {
 
 	myNewFile := models.NewFile(handler.Filename, int(handler.Size), 300, tempFile)
 
-	var mapPtr *map[int][]byte = myNewFile.ProcessFileByNewLine()
+	var mapPtr map[int][]byte = myNewFile.ProcessFileByNewLine()
 
 	podfunction.ProcessFileMap(mapPtr, pc.clientset)
 }

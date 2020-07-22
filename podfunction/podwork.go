@@ -2,11 +2,17 @@ package podfunction
 
 import (
 	"fmt"
+	"log"
+	"strconv"
+	"sync"
+	"time"
 
+	"github.com/nats-io/nats.go"
+	"github.com/saurbh7517/artifact/connection"
 	"github.com/saurbh7517/artifact/errorhandler"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/informers"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
@@ -14,98 +20,181 @@ import (
 var (
 	c         chan *CustomPod
 	numOfPods int
-	// wg        sync.WaitGroup
+	// podNameList []*CustomPod
+	podMap  map[string]*CustomPod
+	wg      sync.WaitGroup
+	fileMap map[int][]byte
 )
 
 //CustomPod struct contains the details of the newly created Ppod.
 type CustomPod struct {
-	tempPod   *apiv1.Pod
-	clientset *kubernetes.Clientset
+	podName      string
+	isPodRunning bool
+	podId        int
+}
+
+func (cp *CustomPod) changeRunningStatus() {
+	if cp.isPodRunning == true {
+		cp.isPodRunning = false
+	} else {
+		cp.isPodRunning = true
+	}
 }
 
 //CreateNewPod creates a new pod for the client
-func CreateNewPod(clientset *kubernetes.Clientset, c chan *CustomPod) {
+func CreateNewPod(clientset *kubernetes.Clientset, podName string) {
 
 	var clientCon *kubernetes.Clientset = clientset
 
 	var labelMap = map[string]string{
-		"app":  "myapp",
-		"type": "backend",
+		"app": "myapp",
 	}
+	argsList := make([]string, 0, 1)
+	argsList = append(argsList, podName)
 
-	var newCustomPod *apiv1.Pod = &apiv1.Pod{}
+	// var newCustomPod *apiv1.Pod = &apiv1.Pod{}
 
-	newPodConfig := &apiv1.Pod{
+	// testConfig := &apiv1.Pod{
+	// 	TypeMeta: v1.TypeMeta{
+	// 		Kind:       "Pod",
+	// 		APIVersion: "v1",
+	// 	},
+	// 	ObjectMeta: v1.ObjectMeta{
+	// 		Name:      podName,
+	// 		Labels:    labelMap,
+	// 		Namespace: "default",
+	// 	},
+	// 	Spec: apiv1.PodSpec{
+	// 		Containers: []apiv1.Container{
+	// 			{
+	// 				Name:  "myapp",
+	// 				Image: "192.168.204.151:5000/myapp",
+	// 				// Args:  argsList,
+	// 				Ports: []apiv1.ContainerPort{
+	// 					{
+	// 						ContainerPort: 8080,
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
+
+	workerconfig := &apiv1.Pod{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "mytestapp",
+			Name:      podName,
 			Labels:    labelMap,
 			Namespace: "default",
 		},
 		Spec: apiv1.PodSpec{
 			Containers: []apiv1.Container{
 				{
-					Name:  "myapp",
-					Image: "192.168.204.151:5000/myapp",
-					Ports: []apiv1.ContainerPort{
-						{
-							ContainerPort: 8080,
-						},
-					},
+					Name:  "workersmall",
+					Image: "192.168.204.151:5000/workersmall",
+					Args:  argsList,
 				},
 			},
 		},
 	}
 
-	newCustomPod, err := clientCon.CoreV1().Pods("default").Create(newPodConfig)
-	c <- &CustomPod{tempPod: newCustomPod, clientset: clientset}
+	_, err := clientCon.CoreV1().Pods("default").Create(workerconfig)
+	// c <- &CustomPod{tempPod: newCustomPod, clientset: clientset}
 
 	errorhandler.Check(err)
-	fmt.Printf("Pods created %s", newCustomPod.Name)
-	// wg.Done()
+	// fmt.Println("Pods created ", newCustomPod.Name)
+	wg.Done()
+
 }
 
 //WatchPod will watch the status of the newly created pod
 func WatchPod(clientset *kubernetes.Clientset) {
 
-	if numOfPods > 0 {
-		customPodArray := make([]*CustomPod, numOfPods)
-
-		// watchList := make([]*v1.ListOptions, numOfPods)
-
-		for i := 0; i < numOfPods; i++ {
-			customPodArray[i] = <-c
-			fmt.Printf("Pod %s is being created... Hold on!!", customPodArray[i].tempPod.Name)
-			// watchList = append(watchList, &v1.ListOptions{
-			// 	Watch:           true,
-			// 	ResourceVersion: customPodArray[i].tempPod.ResourceVersion,
-			// 	FieldSelector:   fields.Set{"metadata.name": "test-pod"}.AsSelector().String(),
-			// 	LabelSelector:   labels.Everything().String(),
-			// })
-		}
-
-		//Setting the watchers for all pods
-		// for i := 0; i < numOfPods; i++ {
-		// 	clientset.CoreV1().Pods("default").Watch(*watchList[i])
-		// }
-
-		factory := informers.NewSharedInformerFactory(clientset, 2)
-		PodInformer := factory.Core().V1().Pods().Informer()
-		PodInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: sendData,
-		})
-
-	} else {
-		fmt.Print("The number of pods is 0 therefore nothing to watch......")
-	}
+	//another way of watching
+	watchList := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", apiv1.NamespaceDefault, fields.Everything())
+	_, controller := cache.NewInformer(
+		watchList,
+		&apiv1.Pod{},
+		time.Second*30,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    postPodCreation,
+			UpdateFunc: updateData,
+		},
+	)
+	stop := make(chan struct{})
+	go controller.Run(stop)
 
 }
 
-func sendData(obj interface{}) {
-	fmt.Println(obj)
+func postPodCreation(obj interface{}) {
+	// fmt.Println(obj)
+	pod := obj.(*apiv1.Pod)
+	var podstatus *apiv1.PodStatus = &pod.Status
+	var podphase *apiv1.PodPhase = &podstatus.Phase
+	// pod.Status ==
+	fmt.Printf("Newly created Pod name %s in phase %s \n", pod.Name, *podphase)
+	fmt.Println("Checking for more resources.....")
+
+}
+
+func sendData(podName string) {
+	var conn *nats.Conn = connection.Nc
+
+	// Create a unique subject name for replies.
+	uniqueReplyTo := nats.NewInbox()
+
+	cp := podMap[podName]
+	data, _ := fileMap[cp.podId]
+
+	// Listen for a single response
+	sub, err := conn.SubscribeSync(uniqueReplyTo)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Send the request.
+	// If processing is synchronous, use Request() which returns the response message.
+	if err := conn.PublishRequest(podName, uniqueReplyTo, data); err != nil {
+		log.Fatal(err)
+	}
+
+	// Read the reply
+	msg, err := sub.NextMsg(time.Second * 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Use the response
+	log.Printf("Reply from %s : %s", podName, msg.Data)
+
+}
+
+func updateData(oldobj interface{}, obj interface{}) {
+	pod := obj.(*apiv1.Pod)
+	// pod.Status ==
+
+	var podstatus *apiv1.PodStatus = &pod.Status
+	var podphase *apiv1.PodPhase = &podstatus.Phase
+	if pod.Name == podMap[pod.Name].podName && *podphase == "Running" {
+		cp := podMap[pod.Name]
+		if cp.isPodRunning == false {
+
+			//start the data sending process
+			sendData(cp.podName)
+			fmt.Println("Changing isPodRunning status to true")
+
+			cp.isPodRunning = true
+
+		}
+	}
+
+	if *podphase == "Running" {
+		fmt.Printf("Updated pod status with pod name %s and with status %s", pod.Name, *podphase)
+		fmt.Println("Looking for more updates.....")
+	}
 
 }
 
@@ -113,21 +202,35 @@ func updatePod() {
 
 }
 
-func deletePod() {
+//DeletePods will delete all the pods
+func DeletePods(clientset *kubernetes.Clientset) {
+	for x, _ := range podMap {
+		fmt.Println("Deleting pod", x)
+		clientset.CoreV1().Pods("default").Delete(x, &v1.DeleteOptions{})
+	}
 
 }
 
 //ProcessFileMap will consume each block generated
-func ProcessFileMap(temp *map[int][]byte, clientset *kubernetes.Clientset) {
-	c := make(chan *CustomPod)
-	numOfPods = len(*temp)
-	for k := range *temp {
-		fmt.Print("Creating a pod for block : ", k)
-		// wg.Add(1)
-		go CreateNewPod(clientset, c)
-	}
+func ProcessFileMap(temp map[int][]byte, clientset *kubernetes.Clientset) {
+
+	fileMap = temp
 
 	WatchPod(clientset)
-	// wg.Wait()
+	// c = make(chan *CustomPod)
+	numOfPods = len(temp)
+	// var podName string
+	podMap = make(map[string]*CustomPod, 200)
+	for k := range temp {
+		fmt.Println("Creating a pod for block : ", k)
+		wg.Add(1)
+
+		podName := "workerpod" + strconv.Itoa(k)
+		go CreateNewPod(clientset, podName)
+		podMap[podName] = &CustomPod{podName: podName, isPodRunning: false, podId: k}
+		// podNameList = append(podNameList, &CustomPod{podName: podName, isPodRunning: false})
+	}
+
+	wg.Wait()
 
 }
