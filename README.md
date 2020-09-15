@@ -17,7 +17,13 @@
 - Collection of results from the workers by the master once the job is completed.
 
 ## Demo
-- 
+- To show communication between serverless functions, a master and a set of workers are created.
+- The master is a HTTP server that receives a file, it divides that file into chunks depending on configurable size.
+- Number of chunks generated is equal to the number of workers spawned.
+- The chunks are distributed to the workers once they are in running state(state checks and updates handled by k8's).
+- The workers receive(communication over NATS) those chunks process and return the result back.
+
+![](gif/demo.gif)
 
 
 
